@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japan News RSS Reader</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --border: #334155;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 .icon {
+            font-size: 1.8rem;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-outline.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .status-bar {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .status-text {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .article-count {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .source-filters {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 8px 20px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .filter-chip {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .filter-chip:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .filter-chip.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 40px;
+        }
+
+        .welcome {
+            text-align: center;
+            padding: 80px 20px;
+        }
+
+        .welcome .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .welcome h2 {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .welcome p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 480px;
+            margin: 0 auto 24px;
+            line-height: 1.6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            color: var(--text-secondary);
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 16px auto 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .articles-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .article-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .article-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .source-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .source-asahi { background: #1a3a6b; color: #7db3ff; }
+        .source-mainichi { background: #3a1a1a; color: #ff9999; }
+        .source-yomiuri { background: #1a3a2a; color: #7ddb99; }
+        .source-nikkei { background: #3a2a1a; color: #ffbf7d; }
+        .source-sankei { background: #2a1a3a; color: #c49fff; }
+        .source-nhk { background: #1a2a3a; color: #7dc4ff; }
+        .source-kyodo { background: #2a3a1a; color: #b8db7d; }
+        .source-jiji { background: #3a1a2a; color: #ff7db3; }
+
+        .article-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .article-card h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .article-desc {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .error-msg {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--danger);
+        }
+
+        .error-msg .icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .feed-status {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 16px;
+        }
+
+        .feed-status-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .feed-status-item {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .feed-status-item.success { border-color: #166534; color: var(--success); }
+        .feed-status-item.error { border-color: #7f1d1d; color: var(--danger); }
+        .feed-status-item.loading { border-color: var(--accent); color: var(--accent); }
+
+        @media (max-width: 640px) {
+            .header h1 { font-size: 1.2rem; }
+            .header-inner { justify-content: center; text-align: center; }
+            .article-card { padding: 16px; }
+            .article-card h3 { font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <h1><span class="icon">📰</span> Japan News RSS Reader</h1>
+            <div class="header-actions">
+                <button class="btn btn-outline" id="sortBtn" onclick="toggleSort()">
+                    <span id="sortIcon">⬇</span> <span id="sortLabel">新しい順</span>
+                </button>
+                <button class="btn btn-primary" id="fetchBtn" onclick="fetchAllFeeds()">
+                    🔄 記事を取得
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="status-bar" id="statusBar" style="display:none;">
+        <span class="status-text" id="statusText"></span>
+        <span class="article-count" id="articleCount"></span>
+    </div>
+
+    <div class="source-filters" id="sourceFilters" style="display:none;"></div>
+
+    <div class="feed-status" id="feedStatus" style="display:none;">
+        <div class="feed-status-grid" id="feedStatusGrid"></div>
+    </div>
+
+    <main class="main" id="content">
+        <div class="welcome">
+            <div class="icon">📰</div>
+            <h2>日本の最新ニュースを一覧で</h2>
+            <p>主要新聞社・通信社のRSSフィードから最新記事を収集します。「記事を取得」ボタンをクリックして開始してください。</p>
+            <button class="btn btn-primary" onclick="fetchAllFeeds()" style="font-size:1rem; padding:14px 32px;">
+                🔄 記事を取得する
+            </button>
+        </div>
+    </main>
+
+    <script>
+        const PROXY_BASE = 'https://api.allorigins.win/raw?url=';
+
+        const RSS_FEEDS = [
+            { name: '朝日新聞', key: 'asahi', url: 'https://www.asahi.com/rss/asahi/newsheadlines.rdf', cssClass: 'source-asahi' },
+            { name: '毎日新聞', key: 'mainichi', url: 'https://mainichi.jp/rss/etc/mainichi-flash.rss', cssClass: 'source-mainichi' },
+            { name: '読売新聞', key: 'yomiuri', url: 'https://www.yomiuri.co.jp/feed/', cssClass: 'source-yomiuri' },
+            { name: '日本経済新聞', key: 'nikkei', url: 'https://assets.wor.jp/rss/rdf/nikkei/news.rdf', cssClass: 'source-nikkei' },
+            { name: '産経新聞', key: 'sankei', url: 'https://www.sankei.com/feeds/feed.xml', cssClass: 'source-sankei' },
+            { name: 'NHK', key: 'nhk', url: 'https://www.nhk.or.jp/rss/news/cat0.xml', cssClass: 'source-nhk' },
+            { name: '共同通信', key: 'kyodo', url: 'https://www.47news.jp/rss/national.xml', cssClass: 'source-kyodo' },
+            { name: '時事通信', key: 'jiji', url: 'https://www.jiji.com/rss/ranking.rdf', cssClass: 'source-jiji' },
+        ];
+
+        let allArticles = [];
+        let sortNewest = true;
+        let activeFilter = 'all';
+
+        function toggleSort() {
+            sortNewest = !sortNewest;
+            document.getElementById('sortIcon').textContent = sortNewest ? '⬇' : '⬆';
+            document.getElementById('sortLabel').textContent = sortNewest ? '新しい順' : '古い順';
+            renderArticles();
+        }
+
+        function setFilter(key) {
+            activeFilter = key;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.key === key);
+            });
+            renderArticles();
+        }
+
+        function renderFilters() {
+            const container = document.getElementById('sourceFilters');
+            const sources = [...new Set(allArticles.map(a => a.sourceKey))];
+            let html = `<button class="filter-chip ${activeFilter === 'all' ? 'active' : ''}" data-key="all" onclick="setFilter('all')">すべて</button>`;
+            for (const src of sources) {
+                const feed = RSS_FEEDS.find(f => f.key === src);
+                if (feed) {
+                    const count = allArticles.filter(a => a.sourceKey === src).length;
+                    html += `<button class="filter-chip ${activeFilter === src ? 'active' : ''}" data-key="${src}" onclick="setFilter('${src}')">${feed.name} (${count})</button>`;
+                }
+            }
+            container.innerHTML = html;
+            container.style.display = 'flex';
+        }
+
+        function formatDate(date) {
+            if (!date || isNaN(date.getTime())) return '';
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMin = Math.floor(diffMs / 60000);
+            const diffHour = Math.floor(diffMs / 3600000);
+
+            if (diffMin < 1) return 'たった今';
+            if (diffMin < 60) return `${diffMin}分前`;
+            if (diffHour < 24) return `${diffHour}時間前`;
+
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const h = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            return `${y}/${m}/${d} ${h}:${min}`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function stripHtml(html) {
+            if (!html) return '';
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
+
+        function renderArticles() {
+            const content = document.getElementById('content');
+            let filtered = activeFilter === 'all' ? [...allArticles] : allArticles.filter(a => a.sourceKey === activeFilter);
+
+            filtered.sort((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db = b.date ? b.date.getTime() : 0;
+                return sortNewest ? db - da : da - db;
+            });
+
+            if (filtered.length === 0) {
+                content.innerHTML = `
+                    <div class="error-msg">
+                        <div class="icon">📭</div>
+                        <p>表示する記事がありません</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '<div class="articles-grid">';
+            for (const article of filtered) {
+                const feed = RSS_FEEDS.find(f => f.key === article.sourceKey);
+                const badgeClass = feed ? feed.cssClass : '';
+                const sourceName = feed ? feed.name : article.sourceKey;
+                html += `
+                    <a class="article-card" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
+                        <div class="article-meta">
+                            <span class="source-badge ${badgeClass}">${escapeHtml(sourceName)}</span>
+                            <span class="article-date">${formatDate(article.date)}</span>
+                        </div>
+                        <h3>${escapeHtml(article.title)}</h3>
+                        ${article.description ? `<p class="article-desc">${escapeHtml(article.description)}</p>` : ''}
+                    </a>`;
+            }
+            html += '</div>';
+            content.innerHTML = html;
+
+            document.getElementById('articleCount').textContent = `${filtered.length} 件`;
+        }
+
+        function updateFeedStatus(feedName, status) {
+            const grid = document.getElementById('feedStatusGrid');
+            const id = `feed-status-${feedName.replace(/\s/g, '')}`;
+            let item = document.getElementById(id);
+            if (!item) {
+                item = document.createElement('span');
+                item.id = id;
+                grid.appendChild(item);
+            }
+            const cls = status === 'loading' ? 'loading' : status === 'success' ? 'success' : 'error';
+            const label = status === 'loading' ? '取得中...' : status === 'success' ? 'OK' : 'NG';
+            item.className = `feed-status-item ${cls}`;
+            item.textContent = `${feedName}: ${label}`;
+        }
+
+        function parseRSS(xmlText, feed) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xmlText, 'text/xml');
+
+            if (doc.querySelector('parsererror')) {
+                console.warn(`Parse error for ${feed.name}`);
+                return [];
+            }
+
+            const articles = [];
+
+            // RSS 2.0 items
+            let items = doc.querySelectorAll('item');
+            // Atom entries
+            if (items.length === 0) {
+                items = doc.querySelectorAll('entry');
+            }
+
+            items.forEach(item => {
+                const title = item.querySelector('title')?.textContent?.trim();
+                if (!title) return;
+
+                // Link: RSS uses <link>, Atom uses <link href="...">
+                let link = '';
+                const linkEl = item.querySelector('link');
+                if (linkEl) {
+                    link = linkEl.getAttribute('href') || linkEl.textContent?.trim() || '';
+                }
+
+                // Date: try multiple fields
+                const dateStr =
+                    item.querySelector('pubDate')?.textContent?.trim() ||
+                    item.querySelector('date')?.textContent?.trim() ||
+                    item.querySelector('published')?.textContent?.trim() ||
+                    item.querySelector('updated')?.textContent?.trim() ||
+                    '';
+
+                let date = dateStr ? new Date(dateStr) : null;
+                if (date && isNaN(date.getTime())) {
+                    // Try dc:date format (ISO 8601)
+                    const dcDate = item.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/', 'date');
+                    if (dcDate.length > 0) {
+                        date = new Date(dcDate[0].textContent.trim());
+                    }
+                }
+                if (date && isNaN(date.getTime())) date = null;
+
+                // dc:date fallback if date is still null
+                if (!date) {
+                    const dcDate = item.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/', 'date');
+                    if (dcDate.length > 0) {
+                        date = new Date(dcDate[0].textContent.trim());
+                        if (isNaN(date.getTime())) date = null;
+                    }
+                }
+
+                const descEl = item.querySelector('description, summary, content');
+                const description = descEl ? stripHtml(descEl.textContent?.trim() || '') : '';
+
+                articles.push({
+                    title,
+                    link,
+                    date,
+                    description: description.substring(0, 200),
+                    sourceKey: feed.key,
+                });
+            });
+
+            return articles;
+        }
+
+        async function fetchFeed(feed) {
+            updateFeedStatus(feed.name, 'loading');
+            try {
+                const response = await fetch(PROXY_BASE + encodeURIComponent(feed.url), {
+                    signal: AbortSignal.timeout(15000),
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const text = await response.text();
+                const articles = parseRSS(text, feed);
+                updateFeedStatus(feed.name, 'success');
+                return articles;
+            } catch (err) {
+                console.warn(`Failed to fetch ${feed.name}:`, err.message);
+                updateFeedStatus(feed.name, 'error');
+                return [];
+            }
+        }
+
+        async function fetchAllFeeds() {
+            const btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+
+            allArticles = [];
+            activeFilter = 'all';
+
+            document.getElementById('feedStatus').style.display = 'block';
+            document.getElementById('feedStatusGrid').innerHTML = '';
+            document.getElementById('statusBar').style.display = 'flex';
+            document.getElementById('statusText').textContent = 'RSSフィードを取得中...';
+            document.getElementById('articleCount').textContent = '';
+            document.getElementById('sourceFilters').style.display = 'none';
+
+            document.getElementById('content').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>RSSフィードを取得中...</p>
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+                    <p class="progress-text" id="progressText">0 / ${RSS_FEEDS.length}</p>
+                </div>`;
+
+            let completed = 0;
+
+            const promises = RSS_FEEDS.map(async (feed) => {
+                const articles = await fetchFeed(feed);
+                completed++;
+                const pct = Math.round((completed / RSS_FEEDS.length) * 100);
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                if (progressFill) progressFill.style.width = pct + '%';
+                if (progressText) progressText.textContent = `${completed} / ${RSS_FEEDS.length}`;
+                return articles;
+            });
+
+            const results = await Promise.all(promises);
+            allArticles = results.flat();
+
+            // Deduplicate by title
+            const seen = new Set();
+            allArticles = allArticles.filter(a => {
+                if (seen.has(a.title)) return false;
+                seen.add(a.title);
+                return true;
+            });
+
+            const successCount = document.querySelectorAll('.feed-status-item.success').length;
+            const errorCount = document.querySelectorAll('.feed-status-item.error').length;
+
+            document.getElementById('statusText').textContent =
+                `${successCount}社から取得完了` + (errorCount > 0 ? ` (${errorCount}社取得失敗)` : '') +
+                ` | 最終更新: ${new Date().toLocaleTimeString('ja-JP')}`;
+
+            renderFilters();
+            renderArticles();
+
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

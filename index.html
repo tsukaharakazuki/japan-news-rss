@@ -408,14 +408,13 @@
         ];
 
         const RSS_FEEDS = [
-            { name: '朝日新聞', key: 'asahi', url: 'https://www.asahi.com/rss/asahi/newsheadlines.rdf', cssClass: 'source-asahi' },
-            { name: '毎日新聞', key: 'mainichi', url: 'https://mainichi.jp/rss/etc/mainichi-flash.rss', cssClass: 'source-mainichi' },
-            { name: '読売新聞', key: 'yomiuri', url: 'https://www.yomiuri.co.jp/feed/', cssClass: 'source-yomiuri' },
-            { name: '日本経済新聞', key: 'nikkei', url: 'https://assets.wor.jp/rss/rdf/nikkei/news.rdf', cssClass: 'source-nikkei' },
-            { name: '産経新聞', key: 'sankei', url: 'https://www.sankei.com/feeds/feed.xml', cssClass: 'source-sankei' },
-            { name: 'NHK', key: 'nhk', url: 'https://www.nhk.or.jp/rss/news/cat0.xml', cssClass: 'source-nhk' },
-            { name: '共同通信', key: 'kyodo', url: 'https://www.47news.jp/rss/national.xml', cssClass: 'source-kyodo' },
-            { name: '時事通信', key: 'jiji', url: 'https://www.jiji.com/rss/ranking.rdf', cssClass: 'source-jiji' },
+            { name: '朝日新聞', key: 'asahi', url: 'https://www.asahi.com/rss/asahi/newsheadlines.rdf', cssClass: 'source-asahi', type: 'rss' },
+            { name: '毎日新聞', key: 'mainichi', url: 'https://mainichi.jp/rss/etc/mainichi-flash.rss', cssClass: 'source-mainichi', type: 'rss' },
+            { name: '読売新聞', key: 'yomiuri', url: 'https://www.yomiuri.co.jp/sitemap-news-latest.xml', cssClass: 'source-yomiuri', type: 'sitemap' },
+            { name: '日本経済新聞', key: 'nikkei', url: 'https://assets.wor.jp/rss/rdf/nikkei/news.rdf', cssClass: 'source-nikkei', type: 'rss' },
+            { name: '産経新聞', key: 'sankei', url: 'https://www.sankei.com/feeds/google-sitemap/?outputType=xml&from=0', cssClass: 'source-sankei', type: 'sitemap' },
+            { name: 'NHK', key: 'nhk', url: 'https://www.nhk.or.jp/rss/news/cat0.xml', cssClass: 'source-nhk', type: 'rss' },
+            { name: '時事通信', key: 'jiji', url: 'https://www.jiji.com/rss/ranking.rdf', cssClass: 'source-jiji', type: 'rss' },
         ];
 
         let allArticles = [];
@@ -611,6 +610,61 @@
             return articles;
         }
 
+        function parseSitemap(xmlText, feed) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xmlText, 'text/xml');
+
+            if (doc.querySelector('parsererror')) {
+                console.warn(`Sitemap parse error for ${feed.name}`);
+                return [];
+            }
+
+            const articles = [];
+            const urls = doc.querySelectorAll('url');
+
+            urls.forEach(urlEl => {
+                const loc = urlEl.querySelector('loc')?.textContent?.trim();
+                if (!loc) return;
+
+                // Google News sitemap uses <news:title> or <news:news>/<news:title>
+                const nsNews = 'http://www.google.com/schemas/sitemap-news/0.9';
+                let title = '';
+                const newsTitles = urlEl.getElementsByTagNameNS(nsNews, 'title');
+                if (newsTitles.length > 0) {
+                    title = newsTitles[0].textContent?.trim() || '';
+                }
+                // Fallback: try to extract title from URL path
+                if (!title) {
+                    const parts = loc.split('/');
+                    title = decodeURIComponent(parts[parts.length - 1] || parts[parts.length - 2] || '').replace(/-/g, ' ');
+                }
+                if (!title) return;
+
+                // Date from <news:publication_date> or <lastmod>
+                let dateStr = '';
+                const pubDates = urlEl.getElementsByTagNameNS(nsNews, 'publication_date');
+                if (pubDates.length > 0) {
+                    dateStr = pubDates[0].textContent?.trim() || '';
+                }
+                if (!dateStr) {
+                    dateStr = urlEl.querySelector('lastmod')?.textContent?.trim() || '';
+                }
+                let date = dateStr ? new Date(dateStr) : null;
+                if (date && isNaN(date.getTime())) date = null;
+
+                articles.push({
+                    title,
+                    link: loc,
+                    date,
+                    description: '',
+                    sourceKey: feed.key,
+                });
+            });
+
+            // Only return the latest 50 articles for sitemaps (they can be huge)
+            return articles.slice(0, 50);
+        }
+
         async function fetchFeed(feed) {
             updateFeedStatus(feed.name, 'loading');
             for (const makeUrl of PROXIES) {
@@ -622,7 +676,7 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const text = await response.text();
                     if (!text || text.length < 50) throw new Error('Empty response');
-                    const articles = parseRSS(text, feed);
+                    const articles = feed.type === 'sitemap' ? parseSitemap(text, feed) : parseRSS(text, feed);
                     if (articles.length === 0) throw new Error('No articles parsed');
                     updateFeedStatus(feed.name, 'success');
                     return articles;
